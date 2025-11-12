@@ -40,7 +40,7 @@ use Monolog\Logger as LoggerMonolog;
  *   alert()     → Ação imediata necessária (dispara email/telegram)
  *   emergency() → Sistema inutilizável (dispara email/telegram)
  * 
- * @package CodeFlow\Logger
+ * @package CodeFlowHub\Logger
  * @version 2.0
  * @see https://www.php-fig.org/psr/psr-3/
  * =========================================================================================

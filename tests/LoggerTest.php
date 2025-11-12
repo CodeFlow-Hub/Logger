@@ -1,8 +1,8 @@
 <?php
 
-namespace CodeFlow\Logger\Tests;
+namespace CodeFlowHub\Logger\Tests;
 
-use CodeFlow\Logger\Logger;
+use CodeFlowHub\Logger\Logger;
 use PHPUnit\Framework\TestCase;
 use org\bovigo\vfs\vfsStream;
 use org\bovigo\vfs\vfsStreamDirectory;

@@ -1,6 +1,6 @@
 <?php
 
-use CodeFlow\Logger\Logger;
+use CodeFlowHub\Logger\Logger;
 
 if (!function_exists('logger'))
 {

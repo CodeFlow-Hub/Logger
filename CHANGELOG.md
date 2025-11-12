@@ -39,5 +39,5 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - PHP >= 7.4
 - Monolog ^2.0 | ^3.0
 - PSR-4 autoloading
-- Namespace: CodeFlow\Logger
+- Namespace: CodeFlowHub\Logger
 - Packagist ready

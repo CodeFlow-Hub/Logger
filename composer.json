@@ -31,7 +31,7 @@
    },
    "autoload": {
       "psr-4": {
-         "CodeFlowHub\\": "src/"
+         "CodeFlowHub\\Logger\\": "src/"
       },
       "files": [
          "src/helpers.php"
@@ -39,7 +39,7 @@
    },
    "autoload-dev": {
       "psr-4": {
-         "CodeFlowHub\\Tests\\": "tests/"
+         "CodeFlowHub\\Logger\\Tests\\": "tests/"
       }
    },
    "scripts": {

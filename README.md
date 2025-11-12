@@ -31,7 +31,7 @@ composer require codeflow-hub/logger
 ### Logging Simples
 
 ```php
-use CodeFlowHub\Logger\logger;
+use CodeFlowHub\logger;
 
 // Logs informativos
 logger()->info("User authentication started", ['user_id' => 123]);
@@ -45,7 +45,7 @@ logger()->critical("Payment gateway unavailable", ['gateway' => 'stripe']);
 ### Com Classe Estática
 
 ```php
-use CodeFlowHub\Logger\Logger;
+use CodeFlowHub\Logger;
 
 Logger::info("User created successfully", ['user_id' => 456]);
 Logger::warning("Validation failed", ['field' => 'email', 'value' => 'invalid@']);
@@ -57,7 +57,7 @@ Logger::error("Failed to save user", ['user_id' => 123, 'error' => $e->getMessag
 ### Notificações por Email
 
 ```php
-use CodeFlowHub\Logger\Logger;
+use CodeFlowHub\Logger;
 
 // Configurar ANTES do primeiro uso do logger
 Logger::enableLogByEmail(
@@ -73,7 +73,7 @@ Logger::error("Database connection failed");
 ### Notificações por Telegram
 
 ```php
-use CodeFlowHub\Logger\Logger;
+use CodeFlowHub\Logger;
 
 // Configurar ANTES do primeiro uso do logger
 Logger::enableLogByTelegram(

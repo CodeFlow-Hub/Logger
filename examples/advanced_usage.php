@@ -8,7 +8,7 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use CodeFlow\Logger\Logger;
+use CodeFlowHub\Logger\Logger;
 
 echo "=== CodeFlow Logger - Exemplo Avançado ===\n\n";
 
