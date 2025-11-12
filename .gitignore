@@ -1,0 +1,31 @@
+# Arquivos e pastas ignorados pelo Git
+/vendor/
+/build/
+/logs/
+/.phpunit.cache/
+/coverage/
+
+# Arquivos de configuração local
+.env
+.env.local
+.env.*.local
+
+# Arquivos do IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de dependências
+composer.lock
+package-lock.json
+yarn.lock
+
+# Arquivos de build
+*.log
+*.cache
