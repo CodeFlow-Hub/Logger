@@ -47,6 +47,12 @@ use Monolog\Logger as LoggerMonolog;
  */
 class Logger
 {
+   const DEFAULT_DIR_LOGS =            __DIR__ . "/../logs";
+   const DEFAULT_FILE_LOG_LABEL =      "file-" . date("Y-m-d") . ".log";
+   const DEFAULT_LEVEL_FILE_LOG =      LoggerMonolog::DEBUG;
+   const DEFAULT_LEVEL_EMAIL_LOG =     LoggerMonolog::ERROR;
+   const DEFAULT_LEVEL_TELEGRAM_LOG =  LoggerMonolog::ERROR;
+
    // =========================================================================================
    // CONSTANTES E PROPRIEDADES
    // =========================================================================================
@@ -60,8 +66,15 @@ class Logger
    /** @var string|null ID único da requisição atual (persistente durante toda a request) */
    private static $requestId = null;
 
-   private static $directory = '';
-   private static $fileLogLabel = '';
+   /** @var string Diretório onde os arquivos de log serão armazenados */
+   private static $dirLogs = self::DEFAULT_DIR_LOGS;
+
+   /** @var string Nome do arquivo de log (inclui data) */
+   private static $fileLogLabel = self::DEFAULT_FILE_LOG_LABEL;
+
+   private static $levelFileLog = self::DEFAULT_LEVEL_FILE_LOG;
+   private static $levelEmailLog = self::DEFAULT_LEVEL_EMAIL_LOG;
+   private static $levelTelegramLog = self::DEFAULT_LEVEL_TELEGRAM_LOG;
 
    // -----------------------------------------------------------------------------------------
    // Configurações de Email
@@ -138,8 +151,8 @@ class Logger
       // Intenção: adicionar handler de arquivo para todos os níveis (DEBUG+).
       self::$engine->pushHandler(
          new StreamHandler(
-            self::$directory . "/" . self::$fileLogLabel,
-            LoggerMonolog::DEBUG
+            self::$dirLogs . "/" . self::$fileLogLabel,
+            self::$levelFileLog
          )
       );
 
@@ -151,7 +164,7 @@ class Logger
                self::$recipientEmail,
                self::$subject,
                self::$senderEmail,
-               LoggerMonolog::ERROR
+               self::$levelEmailLog
             )
          );
       }
@@ -163,7 +176,7 @@ class Logger
             new TelegramBotHandler(
                self::$telegramBotToken,
                self::$telegramChatId,
-               LoggerMonolog::ERROR
+               self::$levelTelegramLog
             )
          );
       }
@@ -512,7 +525,7 @@ class Logger
     * 
     * @return string Request ID único e persistente durante toda a requisição.
     */
-   private static function gererateRequestId(): string
+   private static function generateRequestId(): string
    {
       // Intenção: reutilizar request ID existente para manter rastreabilidade.
       if (!empty(self::$requestId))
@@ -552,14 +565,11 @@ class Logger
    {
       // Intenção: criar contexto base automático com dados da requisição HTTP.
       $baseContext = [
-         'request_id'    => self::gererateRequestId(),
-         'session_id'    => session_id()                 ?? null,
+         'request_id'    => self::generateRequestId(),
+         'session_id'    => (session_status() === PHP_SESSION_ACTIVE ? session_id() : null),
          'user_id'       => $_SESSION['user_id']         ?? null,
          'ip_address'    => $_SERVER['REMOTE_ADDR']      ?? 'unknown',
          'user_agent'    => $_SERVER['HTTP_USER_AGENT']  ?? 'unknown',
-         'method'        => null,
-         'file'          => __FILE__,
-         'line'          => __LINE__,
       ];
 
       // Intenção: mesclar contexto base com dados adicionais sanitizados.
@@ -650,11 +660,14 @@ class Logger
     * 
     * @param array $settings Configurações com chaves 'dir_logs' e 'file_log_label'.
     * @return void
-    * @example Logger::Init(['dir_logs' => '/var/logs/myapp', 'file_log_label' => 'custom-log-2024-06-01.log']);
+    * @example Logger::settings(['dir_logs' => '/var/logs/myapp', 'file_log_label' => 'custom-log-2024-06-01.log']);
     */
-   public static function setting(array $settings = []): void
+   public static function settings(array $settings = []): void
    {
-      self::$directory = $settings['dir_logs']           ?? dirname(__DIR__) . "/logs";
-      self::$fileLogLabel = $settings['file_log_label']  ?? "file-" . date("Y-m-d") . ".log";
+      self::$dirLogs          = $settings['dir_logs']             ?? self::DEFAULT_DIR_LOGS;
+      self::$fileLogLabel     = $settings['file_log_label']       ?? self::DEFAULT_FILE_LOG_LABEL;
+      self::$levelFileLog     = $settings['level_file_log']       ?? self::DEFAULT_LEVEL_FILE_LOG;
+      self::$levelEmailLog    = $settings['level_email_log']      ?? self::DEFAULT_LEVEL_EMAIL_LOG;
+      self::$levelTelegramLog = $settings['level_telegram_log']   ?? self::DEFAULT_LEVEL_TELEGRAM_LOG;
    }
 }
