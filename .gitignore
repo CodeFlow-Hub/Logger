@@ -10,6 +10,12 @@
 .env.local
 .env.*.local
 
+# Configuração Docker local
+Dockerfile
+docker-compose.yml
+docker-compose.yaml
+docker/
+
 # Arquivos do IDE
 .vscode/
 .idea/
