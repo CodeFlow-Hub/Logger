@@ -8,50 +8,35 @@ use Monolog\Handler\TelegramBotHandler;
 use Monolog\Logger as LoggerMonolog;
 
 /**
- * =========================================================================================
- * LOGGER - SISTEMA ENTERPRISE DE LOGS (PSR-3 COMPLIANT)
- * =========================================================================================
- * Wrapper estático para Monolog com suporte a múltiplos handlers (arquivo, email, Telegram).
- * Implementa padrões enterprise de logging com contexto estruturado e sanitização automática.
- * 
- * Recursos:
- * - ✅ Logging em arquivo com rotação diária automática
- * - ✅ Notificações por email para erros críticos (ERROR+)
- * - ✅ Notificações por Telegram para erros críticos (ERROR+)
- * - ✅ Contexto estruturado automático (request_id, session_id, user_id, IP, user-agent)
- * - ✅ Sanitização automática de dados sensíveis (passwords, tokens, secrets)
- * - ✅ Suporte completo aos 8 níveis PSR-3 (debug → emergency)
- * 
- * Uso Básico:
- *   logger()->info("User authentication started", ['user_id' => 123]);
- *   logger()->error("Database connection failed", ['error' => $e->getMessage()]);
- * 
- * Configuração (opcional - antes do primeiro uso):
- *   Logger::enableLogByEmail('from@email.com', 'to@email.com', 'Subject');
- *   Logger::enableLogByTelegram('bot_token', 'chat_id');
- * 
- * Níveis PSR-3 (ordem crescente de severidade):
- *   debug()     → Informações detalhadas para debug (desenvolvimento)
- *   info()      → Eventos informativos gerais (operações bem-sucedidas)
- *   notice()    → Não implementado (use info ou warning)
- *   warning()   → Avisos que não impedem execução
- *   error()     → Erros que exigem atenção (dispara email/telegram)
- *   critical()  → Falhas críticas do sistema (dispara email/telegram)
- *   alert()     → Ação imediata necessária (dispara email/telegram)
- *   emergency() → Sistema inutilizável (dispara email/telegram)
- * 
+ * Facade estática para Monolog que centraliza o pipeline de logs da aplicação.
+ *
+ * Recursos principais:
+ * - Handlers de arquivo, email e Telegram configuráveis em tempo de execução
+ * - Enriquecimento automático de contexto (request, sessão, usuário, rede)
+ * - Sanitização recursiva de dados sensíveis antes do despacho para os handlers
+ * - Cobertura completa dos níveis PSR-3 (debug a emergency)
+ *
+ * Exemplo rápido:
+ * ```php
+ * Logger::settings(['dir_logs' => __DIR__ . '/../logs']);
+ * Logger::enableLogByEmail('infra@app.com', 'ops@app.com');
+ * Logger::info('User authenticated', ['user_id' => 42]);
+ * ```
+ *
  * @package CodeFlowHub\Logger
- * @version 2.0
+ * @since 2.0.0
  * @see https://www.php-fig.org/psr/psr-3/
- * =========================================================================================
  */
 class Logger
 {
-   const DEFAULT_DIR_LOGS =            __DIR__ . "/../logs";
-   const DEFAULT_FILE_LOG_LABEL =      "file-" . date("Y-m-d") . ".log";
-   const DEFAULT_LEVEL_FILE_LOG =      LoggerMonolog::DEBUG;
-   const DEFAULT_LEVEL_EMAIL_LOG =     LoggerMonolog::ERROR;
-   const DEFAULT_LEVEL_TELEGRAM_LOG =  LoggerMonolog::ERROR;
+   const LEVEL_DEBUG       = LoggerMonolog::DEBUG;
+   const LEVEL_INFO        = LoggerMonolog::INFO;
+   const LEVEL_NOTICE      = LoggerMonolog::NOTICE;
+   const LEVEL_WARNING     = LoggerMonolog::WARNING;
+   const LEVEL_ERROR       = LoggerMonolog::ERROR;
+   const LEVEL_CRITICAL    = LoggerMonolog::CRITICAL;
+   const LEVEL_ALERT       = LoggerMonolog::ALERT;
+   const LEVEL_EMERGENCY   = LoggerMonolog::EMERGENCY;
 
    // =========================================================================================
    // CONSTANTES E PROPRIEDADES
@@ -67,14 +52,14 @@ class Logger
    private static $requestId = null;
 
    /** @var string Diretório onde os arquivos de log serão armazenados */
-   private static $dirLogs = self::DEFAULT_DIR_LOGS;
+   private static $dirLogs = null;
 
    /** @var string Nome do arquivo de log (inclui data) */
-   private static $fileLogLabel = self::DEFAULT_FILE_LOG_LABEL;
+   private static $fileLogLabel = null;
 
-   private static $levelFileLog = self::DEFAULT_LEVEL_FILE_LOG;
-   private static $levelEmailLog = self::DEFAULT_LEVEL_EMAIL_LOG;
-   private static $levelTelegramLog = self::DEFAULT_LEVEL_TELEGRAM_LOG;
+   private static $levelFileLog = self::LEVEL_DEBUG;
+   private static $levelEmailLog = self::LEVEL_ERROR;
+   private static $levelTelegramLog = self::LEVEL_ERROR;
 
    // -----------------------------------------------------------------------------------------
    // Configurações de Email
@@ -103,7 +88,6 @@ class Logger
    private static $telegramChatId = null;
 
    /** @var bool Flag de habilitação de notificações por Telegram */
-   /** @var bool Flag de habilitação de notificações por Telegram */
    private static $telegramEnabled = false;
 
    // =========================================================================================
@@ -111,30 +95,11 @@ class Logger
    // =========================================================================================
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: inicializa o sistema de logs
-    * -------------------------------------------------------------------------------------
-    * Intenção: configurar o Monolog com handlers para arquivo, email e Telegram.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Early return se já inicializado (previne duplicação).
-    * 2. Instanciar LoggerMonolog com nome "app".
-    * 3. Adicionar StreamHandler para arquivo (logs/app-YYYY-MM-DD.log, nível DEBUG).
-    * 4. Se email habilitado, adicionar NativeMailerHandler (nível ERROR).
-    * 5. Se Telegram habilitado, adicionar TelegramBotHandler (nível ERROR).
-    * 6. Marcar flag de inicialização.
-    * 
-    * Efeitos colaterais:
-    * - Define self::$engine como instância do Monolog.
-    * - Marca self::$initialized como true.
-    * - Cria arquivo de log no diretório logs/ se não existir.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: nenhum (delega ao Monolog).
-    * 
+    * Inicializa o Monolog e anexa os handlers habilitados.
+    *
+    * Cria o arquivo (padrão `logs/file-YYYY-MM-DD.log`) e adiciona handlers de email ou
+    * Telegram quando configurados antes da primeira chamada pública.
+    *
     * @return void
     */
    private static function initialize(): void
@@ -144,6 +109,11 @@ class Logger
       {
          return;
       }
+
+      // Intenção: definir diretório de logs padrão se não fornecido.
+      if (self::$dirLogs === null) self::$dirLogs = __DIR__ . "/../logs";
+      // Intenção: definir nome do arquivo de log com data atual se não fornecido.
+      if (self::$fileLogLabel === null) self::$fileLogLabel = "file-" . date("Y-m-d") . ".log";
 
       // Intenção: criar engine Monolog com nome "app".
       self::$engine = new LoggerMonolog("app");
@@ -190,28 +160,12 @@ class Logger
    // =========================================================================================
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: registra log de debug
-    * -------------------------------------------------------------------------------------
-    * Intenção: registrar informações detalhadas para desenvolvimento e troubleshooting.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Inicializar logger se necessário.
-    * 2. Construir contexto estruturado com dados da requisição.
-    * 3. Enviar para Monolog com nível DEBUG.
-    * 
-    * Efeitos colaterais: grava em arquivo de log (logs/app-YYYY-MM-DD.log).
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: delega ao Monolog.
-    * 
-    * @param string $message Mensagem em inglês, presente simples (ex: "User data fetched").
-    * @param array $context Contexto estruturado (IDs, dados relevantes sanitizados).
+    * Registra informações detalhadas de depuração.
+    *
+    * @param string $message Mensagem em inglês no presente simples.
+    * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
-    * @example logger()->debug("Database query executed", ['query' => 'SELECT * FROM users', 'rows' => 10]);
+    * @example logger()->debug('Database query executed', ['query' => 'SELECT * FROM users']);
     */
    public static function debug(string $message, array $context = []): void
    {
@@ -221,28 +175,12 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: registra log informativo
-    * -------------------------------------------------------------------------------------
-    * Intenção: registrar eventos informativos gerais e operações bem-sucedidas.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Inicializar logger se necessário.
-    * 2. Construir contexto estruturado com dados da requisição.
-    * 3. Enviar para Monolog com nível INFO.
-    * 
-    * Efeitos colaterais: grava em arquivo de log (logs/app-YYYY-MM-DD.log).
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: delega ao Monolog.
-    * 
-    * @param string $message Mensagem em inglês, presente simples (ex: "User created successfully").
-    * @param array $context Contexto estruturado (IDs, dados relevantes sanitizados).
+    * Registra eventos informativos e operações bem-sucedidas.
+    *
+    * @param string $message Mensagem em inglês no presente simples.
+    * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
-    * @example logger()->info("User authentication started", ['user_id' => 123, 'ip_address' => '192.168.1.1']);
+    * @example logger()->info('User authentication started', ['user_id' => 123]);
     */
    public static function info(string $message, array $context = []): void
    {
@@ -252,28 +190,12 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: registra log de aviso
-    * -------------------------------------------------------------------------------------
-    * Intenção: registrar avisos que não impedem execução mas podem indicar problemas.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Inicializar logger se necessário.
-    * 2. Construir contexto estruturado com dados da requisição.
-    * 3. Enviar para Monolog com nível WARNING.
-    * 
-    * Efeitos colaterais: grava em arquivo de log (logs/app-YYYY-MM-DD.log).
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: delega ao Monolog.
-    * 
-    * @param string $message Mensagem em inglês, presente simples (ex: "Invalid input received").
-    * @param array $context Contexto estruturado (IDs, dados relevantes sanitizados).
+    * Registra avisos que podem exigir acompanhamento.
+    *
+    * @param string $message Mensagem em inglês no presente simples.
+    * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
-    * @example logger()->warning("Validation failed", ['field' => 'email', 'value' => 'invalid@']);
+    * @example logger()->warning('Validation failed', ['field' => 'email']);
     */
    public static function warning(string $message, array $context = []): void
    {
@@ -283,32 +205,12 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: registra log de erro
-    * -------------------------------------------------------------------------------------
-    * Intenção: registrar erros que exigem atenção mas não impedem sistema.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Inicializar logger se necessário.
-    * 2. Construir contexto estruturado com dados da requisição.
-    * 3. Enviar para Monolog com nível ERROR.
-    * 4. Se configurado, dispara notificações por email e/ou Telegram.
-    * 
-    * Efeitos colaterais:
-    * - Grava em arquivo de log (logs/app-YYYY-MM-DD.log).
-    * - Envia email se configurado.
-    * - Envia mensagem Telegram se configurado.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: delega ao Monolog.
-    * 
-    * @param string $message Mensagem em inglês, presente simples (ex: "Database connection failed").
-    * @param array $context Contexto estruturado (IDs, erro, stack trace quando aplicável).
+    * Registra erros que disparam notificações quando configuradas.
+    *
+    * @param string $message Mensagem em inglês no presente simples.
+    * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
-    * @example logger()->error("Failed to save user", ['user_id' => 123, 'error' => $e->getMessage()]);
+    * @example logger()->error('Failed to save user', ['user_id' => 123]);
     */
    public static function error(string $message, array $context = []): void
    {
@@ -318,32 +220,12 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: registra log crítico
-    * -------------------------------------------------------------------------------------
-    * Intenção: registrar condições críticas que requerem atenção imediata.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Inicializar logger se necessário.
-    * 2. Construir contexto estruturado com dados da requisição.
-    * 3. Enviar para Monolog com nível CRITICAL.
-    * 4. Se configurado, dispara notificações por email e/ou Telegram.
-    * 
-    * Efeitos colaterais:
-    * - Grava em arquivo de log (logs/app-YYYY-MM-DD.log).
-    * - Envia email se configurado.
-    * - Envia mensagem Telegram se configurado.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: delega ao Monolog.
-    * 
-    * @param string $message Mensagem em inglês, presente simples (ex: "Payment gateway unavailable").
-    * @param array $context Contexto estruturado (IDs, erro, impacto no sistema).
+    * Registra falhas críticas que demandam intervenção imediata.
+    *
+    * @param string $message Mensagem em inglês no presente simples.
+    * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
-    * @example logger()->critical("Cache system failure", ['cache_type' => 'redis', 'error' => $e->getMessage()]);
+    * @example logger()->critical('Cache system failure', ['cache' => 'redis']);
     */
    public static function critical(string $message, array $context = []): void
    {
@@ -353,32 +235,12 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: registra log de alerta
-    * -------------------------------------------------------------------------------------
-    * Intenção: registrar situações que exigem ação imediata.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Inicializar logger se necessário.
-    * 2. Construir contexto estruturado com dados da requisição.
-    * 3. Enviar para Monolog com nível ALERT.
-    * 4. Se configurado, dispara notificações por email e/ou Telegram.
-    * 
-    * Efeitos colaterais:
-    * - Grava em arquivo de log (logs/app-YYYY-MM-DD.log).
-    * - Envia email se configurado.
-    * - Envia mensagem Telegram se configurado.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: delega ao Monolog.
-    * 
-    * @param string $message Mensagem em inglês, presente simples (ex: "Disk space critical").
-    * @param array $context Contexto estruturado (IDs, métrica, limite).
+    * Registra alertas que exigem ação imediata.
+    *
+    * @param string $message Mensagem em inglês no presente simples.
+    * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
-    * @example logger()->alert("Memory usage above 95%", ['current' => '96%', 'limit' => '95%']);
+    * @example logger()->alert('Memory usage above threshold', ['current' => '96%']);
     */
    public static function alert(string $message, array $context = []): void
    {
@@ -388,32 +250,12 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: registra log de emergência
-    * -------------------------------------------------------------------------------------
-    * Intenção: registrar falha total do sistema (nível mais alto de severidade).
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Inicializar logger se necessário.
-    * 2. Construir contexto estruturado com dados da requisição.
-    * 3. Enviar para Monolog com nível EMERGENCY.
-    * 4. Se configurado, dispara notificações por email e/ou Telegram.
-    * 
-    * Efeitos colaterais:
-    * - Grava em arquivo de log (logs/app-YYYY-MM-DD.log).
-    * - Envia email se configurado.
-    * - Envia mensagem Telegram se configurado.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: delega ao Monolog.
-    * 
-    * @param string $message Mensagem em inglês, presente simples (ex: "System is down").
-    * @param array $context Contexto estruturado (IDs, causa, impacto total).
+    * Registra emergências que indicam indisponibilidade total.
+    *
+    * @param string $message Mensagem em inglês no presente simples.
+    * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
-    * @example logger()->emergency("Database server unreachable", ['host' => 'db.example.com', 'error' => 'Connection timeout']);
+    * @example logger()->emergency('Database server unreachable', ['host' => 'db']);
     */
    public static function emergency(string $message, array $context = []): void
    {
@@ -427,33 +269,12 @@ class Logger
    // =========================================================================================
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: habilita notificações por email
-    * -------------------------------------------------------------------------------------
-    * Intenção: configurar envio de logs por email para erros críticos (ERROR+).
-    * 
-    * Pré-condições: deve ser chamado ANTES do primeiro uso do Logger.
-    * 
-    * Passos / Fluxo:
-    * 1. Armazenar email remetente.
-    * 2. Armazenar email destinatário.
-    * 3. Definir assunto (padrão: "Erro detectado no sistema").
-    * 4. Habilitar flag de email.
-    * 
-    * Efeitos colaterais:
-    * - Define self::$senderEmail, self::$recipientEmail, self::$subject.
-    * - Marca self::$emailEnabled como true.
-    * - Próxima inicialização incluirá NativeMailerHandler.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: nenhum (validação delegada ao Monolog).
-    * 
-    * @param string $senderEmail Email remetente das notificações.
-    * @param string $recipientEmail Email destinatário das notificações.
-    * @param string|null $subject Assunto do email (padrão: "Erro detectado no sistema").
+    * Habilita envio de notificações por email para erros `ERROR+`.
+    *
+    * @param string $senderEmail Endereço remetente das notificações.
+    * @param string $recipientEmail Endereço destinatário das notificações.
+    * @param string|null $subject Assunto customizado (padrão: "Erro detectado no sistema").
     * @return void
-    * @example Logger::enableLogByEmail('noreply@app.com', 'admin@app.com', 'Sistema: Erro Crítico');
     */
    public static function enableLogByEmail(string $senderEmail, string $recipientEmail, ?string $subject = null): void
    {
@@ -465,31 +286,11 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: habilita notificações por Telegram
-    * -------------------------------------------------------------------------------------
-    * Intenção: configurar envio de logs por Telegram para erros críticos (ERROR+).
-    * 
-    * Pré-condições: deve ser chamado ANTES do primeiro uso do Logger.
-    * 
-    * Passos / Fluxo:
-    * 1. Armazenar token do bot do Telegram.
-    * 2. Armazenar ID do chat/canal.
-    * 3. Habilitar flag de Telegram.
-    * 
-    * Efeitos colaterais:
-    * - Define self::$telegramBotToken e self::$telegramChatId.
-    * - Marca self::$telegramEnabled como true.
-    * - Próxima inicialização incluirá TelegramBotHandler.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: nenhum (validação delegada ao Monolog).
-    * 
-    * @param string $botToken Token do bot do Telegram (obtido via BotFather).
-    * @param string $chatId ID do chat ou canal que receberá as mensagens.
+    * Habilita envio de notificações via Telegram para erros `ERROR+`.
+    *
+    * @param string $botToken Token do bot do Telegram (BotFather).
+    * @param string $chatId Chat ou canal que receberá as mensagens.
     * @return void
-    * @example Logger::enableLogByTelegram('123456:ABC-DEF...', '-1001234567890');
     */
    public static function enableLogByTelegram(string $botToken, string $chatId): void
    {
@@ -504,26 +305,9 @@ class Logger
    // =========================================================================================
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: gera ID único da requisição
-    * -------------------------------------------------------------------------------------
-    * Intenção: criar ou retornar ID único para rastreamento de toda a requisição HTTP.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Early return se request ID já foi gerado.
-    * 2. Gerar novo ID único com prefixo "req_" usando uniqid().
-    * 3. Armazenar em self::$requestId para reutilização.
-    * 4. Retornar request ID.
-    * 
-    * Efeitos colaterais: define self::$requestId na primeira chamada.
-    * 
-    * Retornos: string com formato "req_XXXXXXXXXXXXX.XXXXX".
-    * 
-    * Tratamento de erros: nenhum.
-    * 
-    * @return string Request ID único e persistente durante toda a requisição.
+    * Gera ou reaproveita o identificador único da requisição atual.
+    *
+    * @return string Request ID com prefixo `req_`.
     */
    private static function generateRequestId(): string
    {
@@ -539,27 +323,10 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: constrói contexto estruturado do log
-    * -------------------------------------------------------------------------------------
-    * Intenção: adicionar contexto base automático e sanitizar dados do usuário.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Criar array de contexto base (request_id, session_id, user_id, IP, user-agent).
-    * 2. Sanitizar dados adicionais fornecidos pelo usuário.
-    * 3. Mesclar contexto base com dados sanitizados.
-    * 4. Retornar contexto completo.
-    * 
-    * Efeitos colaterais: nenhum.
-    * 
-    * Retornos: array com contexto estruturado mesclado.
-    * 
-    * Tratamento de erros: nenhum (sanitização trata valores inválidos).
-    * 
+    * Monta o contexto padrão enriquecido com os metadados informados pelo usuário.
+    *
     * @param array $context Dados adicionais fornecidos pelo usuário.
-    * @return array Contexto estruturado completo (base + dados sanitizados).
+    * @return array Contexto estruturado já sanitizado.
     */
    private static function buildLogContext(array $context = []): array
    {
@@ -577,30 +344,10 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: sanitiza dados sensíveis do log
-    * -------------------------------------------------------------------------------------
-    * Intenção: remover/mascarar dados sensíveis e normalizar valores para logging seguro.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Early return null se array vazio.
-    * 2. Iterar sobre cada par chave-valor.
-    * 3. Detectar campos sensíveis (password, token, secret, senha, hash) e substituir por "[redacted]".
-    * 4. Para valores escalares: truncar strings em 120 caracteres.
-    * 5. Para arrays: aplicar sanitização recursivamente.
-    * 6. Para objetos: registrar apenas o nome da classe.
-    * 7. Retornar array sanitizado.
-    * 
-    * Efeitos colaterais: nenhum.
-    * 
-    * Retornos: array sanitizado ou null se vazio.
-    * 
-    * Tratamento de erros: nenhum (trata tipos inesperados graciosamente).
-    * 
+    * Sanitiza valores sensíveis e normaliza o payload do log.
+    *
     * @param array $params Dados originais a serem sanitizados.
-    * @return array|null Array sanitizado ou null se entrada vazia.
+    * @return array|null Dados limpos ou `null` quando vazios.
     */
    private static function sanitizeLogParams(array $params): ?array
    {
@@ -640,34 +387,18 @@ class Logger
    }
 
    /**
-    * -------------------------------------------------------------------------------------
-    * MÉTODO: inicializa configurações do Logger
-    * -------------------------------------------------------------------------------------
-    * Intenção: configurar diretório e nome do arquivo de log.
-    * 
-    * Pré-condições: nenhuma.
-    * 
-    * Passos / Fluxo:
-    * 1. Definir diretório de logs a partir das configurações fornecidas.
-    * 2. Definir nome do arquivo de log com base no rótulo fornecido ou padrão.
-    * 
-    * Efeitos colaterais:
-    * - Define self::$directory e self::$fileLogLabel.
-    * 
-    * Retornos: void.
-    * 
-    * Tratamento de erros: nenhum.
-    * 
-    * @param array $settings Configurações com chaves 'dir_logs' e 'file_log_label'.
+    * Ajusta diretório, rótulos e níveis padrão do logger.
+    *
+    * @param array $settings Chaves suportadas: dir_logs, file_log_label, level_file_log,
+    *                        level_email_log e level_telegram_log.
     * @return void
-    * @example Logger::settings(['dir_logs' => '/var/logs/myapp', 'file_log_label' => 'custom-log-2024-06-01.log']);
     */
    public static function settings(array $settings = []): void
    {
-      self::$dirLogs          = $settings['dir_logs']             ?? self::DEFAULT_DIR_LOGS;
-      self::$fileLogLabel     = $settings['file_log_label']       ?? self::DEFAULT_FILE_LOG_LABEL;
-      self::$levelFileLog     = $settings['level_file_log']       ?? self::DEFAULT_LEVEL_FILE_LOG;
-      self::$levelEmailLog    = $settings['level_email_log']      ?? self::DEFAULT_LEVEL_EMAIL_LOG;
-      self::$levelTelegramLog = $settings['level_telegram_log']   ?? self::DEFAULT_LEVEL_TELEGRAM_LOG;
+      self::$dirLogs          = $settings['dir_logs']             ?? self::$dirLogs;
+      self::$fileLogLabel     = $settings['file_log_label']       ?? self::$fileLogLabel;
+      self::$levelFileLog     = $settings['level_file_log']       ?? self::LEVEL_DEBUG;
+      self::$levelEmailLog    = $settings['level_email_log']      ?? self::LEVEL_ERROR;
+      self::$levelTelegramLog = $settings['level_telegram_log']   ?? self::LEVEL_ERROR;
    }
 }
