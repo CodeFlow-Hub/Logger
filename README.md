@@ -31,7 +31,7 @@ composer require codeflow-hub/logger
 ### Logging Simples
 
 ```php
-use function CodeFlowHub\Logger\logger;
+use CodeFlowHub\Logger\logger;
 
 // Logs informativos
 logger()->info("User authentication started", ['user_id' => 123]);
