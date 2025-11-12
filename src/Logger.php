@@ -60,6 +60,9 @@ class Logger
    /** @var string|null ID único da requisição atual (persistente durante toda a request) */
    private static $requestId = null;
 
+   private static $directory = '';
+   private static $fileLogLabel = '';
+
    // -----------------------------------------------------------------------------------------
    // Configurações de Email
    // -----------------------------------------------------------------------------------------
@@ -134,7 +137,10 @@ class Logger
 
       // Intenção: adicionar handler de arquivo para todos os níveis (DEBUG+).
       self::$engine->pushHandler(
-         new StreamHandler(__DIR__ . "/../logs/app-" . date("Y-m-d") . ".log", LoggerMonolog::DEBUG)
+         new StreamHandler(
+            self::$directory . "/" . self::$fileLogLabel,
+            LoggerMonolog::DEBUG
+         )
       );
 
       // Intenção: adicionar handler de email para erros críticos (ERROR+).
@@ -621,5 +627,34 @@ class Logger
       }
 
       return $sanitized;
+   }
+
+   /**
+    * -------------------------------------------------------------------------------------
+    * MÉTODO: inicializa configurações do Logger
+    * -------------------------------------------------------------------------------------
+    * Intenção: configurar diretório e nome do arquivo de log.
+    * 
+    * Pré-condições: nenhuma.
+    * 
+    * Passos / Fluxo:
+    * 1. Definir diretório de logs a partir das configurações fornecidas.
+    * 2. Definir nome do arquivo de log com base no rótulo fornecido ou padrão.
+    * 
+    * Efeitos colaterais:
+    * - Define self::$directory e self::$fileLogLabel.
+    * 
+    * Retornos: void.
+    * 
+    * Tratamento de erros: nenhum.
+    * 
+    * @param array $settings Configurações com chaves 'dir_logs' e 'file_log_label'.
+    * @return void
+    * @example Logger::Init(['dir_logs' => '/var/logs/myapp', 'file_log_label' => 'custom-log-2024-06-01.log']);
+    */
+   public static function setting(array $settings = []): void
+   {
+      self::$directory = $settings['dir_logs']           ?? dirname(__DIR__) . "/logs";
+      self::$fileLogLabel = $settings['file_log_label']  ?? "file-" . date("Y-m-d") . ".log";
    }
 }
