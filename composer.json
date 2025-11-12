@@ -1,5 +1,5 @@
 {
-   "name": "codeflowhub/logger",
+   "name": "codeflow-hub/logger",
    "type": "library",
    "description": "Sistema enterprise de logs PSR-3 compliant com suporte a múltiplos handlers (arquivo, email, Telegram). Wrapper para Monolog com contexto estruturado e sanitização automática de dados sensíveis.",
    "keywords": [
@@ -14,7 +14,7 @@
    "license": "MIT",
    "authors": [
       {
-         "name": "CodeFlow Hub",
+         "name": "CodeFlow-Hub",
          "email": "contato@codeflow.com.br",
          "homepage": "https://github.com/codeflow-hub"
       }

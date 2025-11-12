@@ -1,9 +1,9 @@
 # CodeFlow Logger
 
-[![Latest Stable Version](https://img.shields.io/packagist/v/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
-[![Total Downloads](https://img.shields.io/packagist/dt/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
-[![License](https://img.shields.io/packagist/l/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
-[![PHP Version Require](https://img.shields.io/packagist/php-v/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
+[![Latest Stable Version](https://img.shields.io/packagist/v/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
+[![Total Downloads](https://img.shields.io/packagist/dt/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
+[![License](https://img.shields.io/packagist/l/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
+[![PHP Version Require](https://img.shields.io/packagist/php-v/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
 
 Sistema enterprise de logs **PSR-3 compliant** com suporte a múltiplos handlers (arquivo, email, Telegram). 
 
@@ -20,10 +20,10 @@ Wrapper estático para **Monolog** com contexto estruturado automático e saniti
 - ✅ **Interface estática simples** - sem necessidade de DI ou configuração complexa
 - ✅ **Zero configuração** - funciona out-of-the-box
 
-## 📦 Instalação
+## Instalação
 
 ```bash
-composer require codeflow/logger
+composer require codeflow-hub/logger
 ```
 
 ## 🚀 Uso Básico

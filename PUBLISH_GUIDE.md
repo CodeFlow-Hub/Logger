@@ -66,8 +66,8 @@ git push origin v1.0.0
 
 ## 📋 Informações do Pacote
 
-- **Nome:** `codeflow/logger`
-- **Namespace:** `CodeFlow\Logger`
+- **Nome:** `codeflow-hub/logger`
+- **Namespace:** `CodeFlowHub\Logger`
 - **Licença:** MIT
 - **PHP mínimo:** 7.4
 - **Dependência:** `monolog/monolog ^2.0|^3.0`
@@ -96,8 +96,8 @@ git push origin v1.1.0
 
 Após publicação, o pacote estará disponível:
 
-- **Instalação:** `composer require codeflow/logger`
-- **URL:** https://packagist.org/packages/codeflow/logger
+- **Instalação:** `composer require codeflow-hub/logger`
+- **URL:** https://packagist.org/packages/codeflow-hub/logger
 - **Stats:** Downloads, estrelas, etc.
 - **Auto-update:** Via webhook GitHub
 
@@ -106,10 +106,10 @@ Após publicação, o pacote estará disponível:
 Adicionar ao README.md:
 
 ```markdown
-[![Latest Stable Version](https://img.shields.io/packagist/v/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
-[![Total Downloads](https://img.shields.io/packagist/dt/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
-[![License](https://img.shields.io/packagist/l/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
-[![PHP Version Require](https://img.shields.io/packagist/php-v/codeflow/logger.svg)](https://packagist.org/packages/codeflow/logger)
+[![Latest Stable Version](https://img.shields.io/packagist/v/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
+[![Total Downloads](https://img.shields.io/packagist/dt/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
+[![License](https://img.shields.io/packagist/l/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
+[![PHP Version Require](https://img.shields.io/packagist/php-v/codeflow-hub/logger.svg)](https://packagist.org/packages/codeflow-hub/logger)
 ```
 
 ## 🎯 Próximos Passos
@@ -118,7 +118,7 @@ Adicionar ao README.md:
    ```bash
    composer create-project --no-dev temp-test
    cd temp-test  
-   composer require codeflow/logger
+   composer require codeflow-hub/logger
    ```
 
 2. **Monitorar:**
