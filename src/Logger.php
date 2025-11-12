@@ -1,6 +1,6 @@
 <?php
 
-namespace CodeFlow\Logger;
+namespace CodeFlowHub\Logger;
 
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\NativeMailerHandler;
