@@ -23,7 +23,7 @@ Wrapper estático para **Monolog** com contexto estruturado automático e saniti
 ## 📦 Instalação
 
 ```bash
-composer require codeflow/logger
+composer require codeflowhub/logger
 ```
 
 ## 🚀 Uso Básico
