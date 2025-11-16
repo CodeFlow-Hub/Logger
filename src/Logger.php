@@ -208,7 +208,7 @@ class Logger
     * @param array $context Metadados adicionais que serão sanitizados.
     * @return void
     */
-   private function toWrite(int $level, string $message, array $context = []): void
+   private static function toWrite(int $level, string $message, array $context = []): void
    {
       if (!$level || !$message)
       {
