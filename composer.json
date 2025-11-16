@@ -1,6 +1,6 @@
 {
    "name": "codeflow-hub/logger",
-   "version": "1.0.7",
+   "version": "1.0.8",
    "type": "library",
    "description": "Sistema enterprise de logs PSR-3 compliant com suporte a múltiplos handlers (arquivo, email, Telegram). Wrapper para Monolog com contexto estruturado e sanitização automática de dados sensíveis.",
    "keywords": [
