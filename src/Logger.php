@@ -43,6 +43,15 @@ class Logger
    const LEVEL_ALERT       = LoggerMonolog::ALERT;
    const LEVEL_EMERGENCY   = LoggerMonolog::EMERGENCY;
 
+   /** @var array Campos padrão considerados sensíveis para sanitização */
+   const SENSITIVE_FIELDS_DEFAULT = ['password', 'token', 'secret', 'senha', 'hash'];
+
+   /** Modo de mascaramento: substitui completamente por [redacted] */
+   const MASK_MODE_REDACTED = 'redacted';
+
+   /** Modo de mascaramento: mantém últimos 4 caracteres visíveis, substitui o resto por ******* */
+   const MASK_MODE_PARTIAL = 'partial';
+
    // =========================================================================================
    // CONSTANTES E PROPRIEDADES
    // =========================================================================================
@@ -62,8 +71,13 @@ class Logger
    /** @var string Nome do arquivo de log (inclui data) */
    private static $fileLogLabel = null;
 
+   /** @var int Nível mínimo para logs em arquivo */
    private static $levelFileLog = self::LEVEL_DEBUG;
+
+   /** @var int Nível mínimo para logs por email */
    private static $levelEmailLog = self::LEVEL_ERROR;
+
+   /** @var int Nível mínimo para logs via Telegram */
    private static $levelTelegramLog = self::LEVEL_CRITICAL;
 
    // -----------------------------------------------------------------------------------------
@@ -94,6 +108,12 @@ class Logger
 
    /** @var bool Flag de habilitação de notificações por Telegram */
    private static $telegramEnabled = false;
+
+   /** @var array Campos sensíveis customizados adicionados pelo usuário */
+   private static $customSensitiveFields = [];
+
+   /** @var string Modo de mascaramento atual (padrão: REDACTED) */
+   private static $maskMode = self::MASK_MODE_REDACTED;
 
    /** @var Exception|null Última exceção capturada no logger */
    private static $fail = null;
@@ -191,6 +211,11 @@ class Logger
       self::$dirLogs = $path;
    }
 
+   /**
+    * Retorna a última exceção capturada no logger, se houver.
+    *
+    * @return Exception|null Última exceção ou `null` se não houver falhas.
+    */
    public static function fail(): ?Exception
    {
       return self::$fail;
@@ -378,9 +403,117 @@ class Logger
       self::$telegramEnabled = true;
    }
 
+   /**
+    * Adiciona campos sensíveis customizados que serão sanitizados automaticamente.
+    *
+    * Os campos adicionados são combinados com os campos padrão (password, token, secret, senha, hash).
+    * Campos duplicados são automaticamente removidos. A verificação é case-insensitive.
+    *
+    * @param array $fields Array de strings com nomes de campos sensíveis a serem adicionados.
+    * @return void
+    * @example Logger::addSensitiveFields(['credit_card', 'ssn', 'api_key']);
+    */
+   public static function addSensitiveFields(array $fields): void
+   {
+      // Intenção: validar e filtrar apenas strings não vazias.
+      $validFields = array_filter($fields, function ($field) {
+         return is_string($field) && !empty(trim($field));
+      });
+
+      if (empty($validFields))
+      {
+         return;
+      }
+
+      // Intenção: normalizar campos para lowercase para comparação case-insensitive.
+      $normalizedFields = array_map('strtolower', $validFields);
+
+      // Intenção: mesclar campos customizados com os já existentes, removendo duplicatas.
+      self::$customSensitiveFields = array_values(array_unique(
+         array_merge(self::$customSensitiveFields, $normalizedFields)
+      ));
+   }
+
+   /**
+    * Configura o modo de mascaramento para campos sensíveis.
+    *
+    * Modos disponíveis:
+    * - MASK_MODE_REDACTED: Substitui completamente por [redacted] (padrão)
+    * - MASK_MODE_PARTIAL: Mantém últimos 4 caracteres visíveis, resto por *******
+    *
+    * @param string $mode Modo de mascaramento (use as constantes MASK_MODE_*).
+    * @return void
+    * @example Logger::setMaskMode(Logger::MASK_MODE_PARTIAL);
+    */
+   public static function setMaskMode(string $mode): void
+   {
+      // Intenção: validar que o modo informado é válido.
+      $validModes = [self::MASK_MODE_REDACTED, self::MASK_MODE_PARTIAL];
+
+      if (!in_array($mode, $validModes, true))
+      {
+         self::$fail = new Exception("Invalid mask mode. Use MASK_MODE_REDACTED or MASK_MODE_PARTIAL.");
+         return;
+      }
+
+      // Intenção: definir modo de mascaramento.
+      self::$maskMode = $mode;
+   }
+
    // =========================================================================================
    // MÉTODOS PRIVADOS (HELPERS)
    // =========================================================================================
+
+   /**
+    * Retorna array com todos os campos sensíveis (padrão + customizados).
+    *
+    * Combina os campos padrão definidos na constante SENSITIVE_FIELDS_DEFAULT
+    * com os campos customizados adicionados via addSensitiveFields().
+    *
+    * @return array Array de campos sensíveis em lowercase para verificação case-insensitive.
+    */
+   private static function getSensitiveFields(): array
+   {
+      // Intenção: mesclar campos padrão com campos customizados, garantindo valores únicos.
+      return array_values(array_unique(
+         array_merge(
+            array_map('strtolower', self::SENSITIVE_FIELDS_DEFAULT),
+            self::$customSensitiveFields
+         )
+      ));
+   }
+
+   /**
+    * Aplica mascaramento ao valor conforme o modo configurado.
+    *
+    * @param mixed $value Valor original a ser mascarado.
+    * @return string Valor mascarado conforme modo configurado.
+    */
+   private static function applyMask($value): string
+   {
+      // Intenção: converter valor para string se necessário.
+      $stringValue = is_string($value) ? $value : (string) $value;
+
+      // Intenção: aplicar mascaramento conforme modo configurado.
+      if (self::$maskMode === self::MASK_MODE_PARTIAL)
+      {
+         // Modo parcial: mantém últimos 4 caracteres, resto substitui por *******
+         $length = mb_strlen($stringValue);
+
+         if ($length <= 4)
+         {
+            // Se valor tem 4 ou menos caracteres, mascarar tudo.
+            return '*******';
+         }
+
+         // Manter últimos 4 caracteres visíveis.
+         $lastFour = mb_substr($stringValue, -4);
+         return '*******' . $lastFour;
+      }
+
+      // Modo padrão: REDACTED - substitui completamente.
+      return '[redacted]';
+   }
 
    /**
     * Gera ou reaproveita o identificador único da requisição atual.
@@ -412,7 +545,6 @@ class Logger
       $baseContext = [
          'request_id'    => self::generateRequestId(),
          'session_id'    => (session_status() === PHP_SESSION_ACTIVE ? session_id() : null),
-         'user_id'       => $_SESSION['user_id']         ?? null,
          'ip_address'    => $_SERVER['REMOTE_ADDR']      ?? 'unknown',
          'user_agent'    => $_SERVER['HTTP_USER_AGENT']  ?? 'unknown',
       ];
@@ -437,14 +569,37 @@ class Logger
 
       $sanitized = [];
 
+      // Intenção: obter lista de campos sensíveis uma única vez para otimizar performance.
+      $sensitiveFields = self::getSensitiveFields();
+
       foreach ($params as $key => $value)
       {
          $lowerKey = is_string($key) ? strtolower($key) : '';
 
          // Intenção: detectar e mascarar campos sensíveis (senhas, tokens, secrets).
-         if (preg_match('/password|token|secret|senha|hash/', $lowerKey))
+         $isSensitive = false;
+
+         foreach ($sensitiveFields as $sensitiveField)
          {
-            $sanitized[$key] = '[redacted]';
+            if (strpos($lowerKey, $sensitiveField) !== false)
+            {
+               $isSensitive = true;
+               break;
+            }
+         }
+
+         if ($isSensitive)
+         {
+            // Intenção: aplicar mascaramento conforme modo configurado.
+            if (is_scalar($value) || $value === null)
+            {
+               $sanitized[$key] = self::applyMask($value);
+            }
+            else
+            {
+               // Para valores não escalares, usar mascaramento padrão.
+               $sanitized[$key] = '[redacted]';
+            }
             continue;
          }
 
