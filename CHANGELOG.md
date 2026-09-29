@@ -18,6 +18,16 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Corrigido
+- `level_file_log`, `dir_logs` e `file_log_label` passados em `Logger::settings()` eram ignorados: o handler de arquivo era criado com DEBUG antes da leitura das configurações
+- `Logger::configure()->apply()` descartava email/Telegram habilitados antes via `enableLogByEmail()`/`enableLogByTelegram()`
+
+### Mudado
+- `Logger::configure()` parte de uma cópia da configuração atual em vez de uma configuração vazia
+
+### Depreciado
+- `Logger::settings()`, mantido como alias da configuração fluente; use `Logger::configure()->...->apply()`
+
 ### Planejado
 - Suporte a mais handlers do Monolog (Slack, Discord, etc.)
 - Formatters customizados

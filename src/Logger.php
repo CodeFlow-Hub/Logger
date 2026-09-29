@@ -20,8 +20,10 @@ use Monolog\Logger as LoggerMonolog;
  *
  * Uso tipico:
  * ```php
- * Logger::settings(['dir_logs' => __DIR__ . '/../logs']);
- * Logger::enableLogByEmail('infra@app.com', 'ops@app.com');
+ * Logger::configure()
+ *     ->setLogDirectory(__DIR__ . '/../logs')
+ *     ->enableEmail('infra@app.com', 'ops@app.com')
+ *     ->apply();
  * Logger::info('User authenticated', ['user_id' => 42]);
  * ```
  *
@@ -65,49 +67,8 @@ class Logger
    /** @var string|null ID único da requisição atual (persistente durante toda a request) */
    private static $requestId = null;
 
-   /** @var string Diretório onde os arquivos de log serão armazenados */
-   private static $dirLogs = null;
-
-   /** @var string Nome do arquivo de log (inclui data) */
-   private static $fileLogLabel = null;
-
-   /** @var int Nível mínimo para logs em arquivo */
-   private static $levelFileLog = self::LEVEL_DEBUG;
-
-   /** @var int Nível mínimo para logs por email */
-   private static $levelEmailLog = self::LEVEL_ERROR;
-
-   /** @var int Nível mínimo para logs via Telegram */
-   private static $levelTelegramLog = self::LEVEL_CRITICAL;
-
-   // -----------------------------------------------------------------------------------------
-   // Configurações de Email
-   // -----------------------------------------------------------------------------------------
-
-   /** @var string|null Email remetente para notificações */
-   private static $senderEmail = null;
-
-   /** @var string|null Email destinatário para notificações */
-   private static $recipientEmail = null;
-
-   /** @var string|null Assunto dos emails de notificação */
-   private static $subject = null;
-
-   /** @var bool Flag de habilitação de notificações por email */
-   private static $emailEnabled = false;
-
-   // -----------------------------------------------------------------------------------------
-   // Configurações de Telegram
-   // -----------------------------------------------------------------------------------------
-
-   /** @var string|null Token do bot do Telegram */
-   private static $telegramBotToken = null;
-
-   /** @var string|null ID do chat/canal do Telegram */
-   private static $telegramChatId = null;
-
-   /** @var bool Flag de habilitação de notificações por Telegram */
-   private static $telegramEnabled = false;
+   /** @var LoggerConfiguration|null Configuração atual do logger */
+   private static $configuration = null;
 
    /** @var array Campos sensíveis customizados adicionados pelo usuário */
    private static $customSensitiveFields = [];
@@ -139,76 +100,103 @@ class Logger
          return;
       }
 
+      // Intenção: garantir que há uma configuração padrão se não foi definida.
+      if (self::$configuration === null)
+      {
+         self::$configuration = new LoggerConfiguration();
+      }
+
       // Intenção: criar engine Monolog com nome "app".
       self::$engine = new LoggerMonolog("app");
 
-      // Intenção: definir diretório de logs (padrão).
-      self::setLogDirectory();
-      // Intenção: definir nome do arquivo de log com data atual se não fornecido.
-      if (self::$fileLogLabel === null) self::$fileLogLabel = "file-" . date("Y-m-d") . ".log";
+      // Intenção: definir diretório de logs.
+      $logDirectory = self::$configuration->getLogDirectory();
+      if ($logDirectory === null)
+      {
+         $logDirectory = self::getDefaultLogDirectory();
+      }
 
-      // Intenção: adicionar handler de arquivo para todos os níveis (DEBUG+).
+      // Intenção: definir nome do arquivo de log com data atual se não fornecido.
+      $fileLogLabel = self::$configuration->getFileLogLabel();
+      if ($fileLogLabel === null)
+      {
+         $fileLogLabel = "file-" . date("Y-m-d") . ".log";
+      }
+
+      // Intenção: adicionar handler de arquivo.
       self::$engine->pushHandler(
          new StreamHandler(
-            self::$dirLogs . "/" . self::$fileLogLabel,
-            self::$levelFileLog
+            $logDirectory . "/" . $fileLogLabel,
+            self::$configuration->getLevelFileLog()
          )
       );
 
-      // Intenção: adicionar handler de email para erros críticos (ERROR+).
-      if (self::$emailEnabled)
+      // Intenção: adicionar handler de email se habilitado.
+      if (self::$configuration->isEmailEnabled())
       {
          self::$engine->pushHandler(
             new NativeMailerHandler(
-               self::$recipientEmail,
-               self::$subject,
-               self::$senderEmail,
-               self::$levelEmailLog
+               self::$configuration->getRecipientEmail(),
+               self::$configuration->getSubject(),
+               self::$configuration->getSenderEmail(),
+               self::$configuration->getLevelEmailLog()
             )
          );
       }
 
-      // Intenção: adicionar handler de Telegram para erros críticos (ERROR+).
-      if (self::$telegramEnabled)
+      // Intenção: adicionar handler de Telegram se habilitado.
+      if (self::$configuration->isTelegramEnabled())
       {
          self::$engine->pushHandler(
             new TelegramBotHandler(
-               self::$telegramBotToken,
-               self::$telegramChatId,
-               self::$levelTelegramLog
+               self::$configuration->getTelegramBotToken(),
+               self::$configuration->getTelegramChatId(),
+               self::$configuration->getLevelTelegramLog()
             )
          );
       }
+
+      // Intenção: aplicar campos sensíveis customizados (substituir em vez de fazer merge).
+      $customFields = self::$configuration->getCustomSensitiveFields();
+      if (!empty($customFields))
+      {
+         self::$customSensitiveFields = $customFields;
+      }
+
+      // Intenção: aplicar modo de mascaramento.
+      self::$maskMode = self::$configuration->getMaskMode();
 
       // Intenção: marcar logger como inicializado.
       self::$initialized = true;
    }
 
    /**
-    * Define o diretório onde os arquivos de log serão armazenados.
+    * Retorna o diretório padrão para logs.
     *
-    * @param string|null $dir Diretório customizado (opcional).
-    * @return void
+    * @return string Diretório padrão de logs.
     */
-   private static function setLogDirectory(?string $dir = null): void
+   private static function getDefaultLogDirectory(): string
    {
-      // Intenção: validar diretório customizado.
-      if ($dir && is_dir($dir) && is_writable($dir))
-      {
-         self::$dirLogs = $dir;
-         return;
-      }
-
       // Intenção: usar diretório padrão relativo à raiz do projeto.
       $path = realpath(dirname(__DIR__, 4)) . "/logs";
 
-      if (!is_dir($path) || !is_writable($path))
+      if (!is_dir($path))
       {
-         self::$fail = new Exception("Log directory is not writable: " . $path);
-         return;
+         // Intenção: tentar criar o diretório se não existir.
+         if (!mkdir($path, 0755, true) && !is_dir($path))
+         {
+            self::$fail = new Exception("Could not create log directory: " . $path);
+            return $path;
+         }
       }
 
-      self::$dirLogs = $path;
+      if (!is_writable($path))
+      {
+         self::$fail = new Exception("Log directory is not writable: " . $path);
+         return $path;
+      }
+
+      return $path;
    }
 
    /**
@@ -219,6 +207,117 @@ class Logger
    public static function fail(): ?Exception
    {
       return self::$fail;
+   }
+
+   // =========================================================================================
+   // MÉTODOS DE CONFIGURAÇÃO FLUENTE
+   // =========================================================================================
+
+   /**
+    * Inicia a configuração fluente do Logger.
+    *
+    * Retorna uma cópia da configuração atual (ou uma nova, se ainda não houver),
+    * permitindo ajustar apenas o necessário sem descartar o que já foi habilitado
+    * antes, como notificações por email ou Telegram.
+    *
+    * @return LoggerConfiguration Instância de configuração para encadeamento.
+    * @example
+    * ```php
+    * Logger::configure()
+    *     ->setLogDirectory(__DIR__ . '/logs')
+    *     ->setFileLogLabel('app-' . date('Y-m-d') . '.log')
+    *     ->setLevelFileLog(Logger::LEVEL_DEBUG)
+    *     ->enableEmail('from@app.com', 'to@app.com')
+    *     ->apply();
+    * ```
+    */
+   public static function configure(): LoggerConfiguration
+   {
+      // Intenção: partir da configuração vigente para que a ordem das chamadas não descarte ajustes anteriores.
+      return self::$configuration !== null ? clone self::$configuration : new LoggerConfiguration();
+   }
+
+   /**
+    * Aplica configurações a partir de um array (API legada).
+    *
+    * Chaves aceitas: `dir_logs`, `file_log_label`, `level_file_log`,
+    * `level_email_log` e `level_telegram_log`. Chaves ausentes mantêm o valor atual.
+    * Pode ser chamado antes ou depois da primeira escrita de log: os handlers
+    * são recriados com a nova configuração. Erros de validação não lançam exceção
+    * e ficam disponíveis em {@see self::fail()}.
+    *
+    * @param array $settings Configurações a aplicar.
+    * @return void
+    * @deprecated Use Logger::configure()->...->apply() instead.
+    */
+   public static function settings(array $settings = []): void
+   {
+      $config = self::configure();
+
+      if (isset($settings['dir_logs']))
+      {
+         $config->setLogDirectory($settings['dir_logs']);
+      }
+
+      if (isset($settings['file_log_label']))
+      {
+         $config->setFileLogLabel($settings['file_log_label']);
+      }
+
+      if (isset($settings['level_file_log']))
+      {
+         $config->setLevelFileLog($settings['level_file_log']);
+      }
+
+      if (isset($settings['level_email_log']))
+      {
+         $config->setLevelEmailLog($settings['level_email_log']);
+      }
+
+      if (isset($settings['level_telegram_log']))
+      {
+         $config->setLevelTelegramLog($settings['level_telegram_log']);
+      }
+
+      // Intenção: manter o contrato legado de não lançar exceção; o erro fica disponível em fail().
+      if ($config->getLastError() !== null)
+      {
+         self::$fail = $config->getLastError();
+      }
+
+      self::applyConfiguration($config);
+   }
+
+   /**
+    * Aplica uma configuração ao Logger.
+    *
+    * Este método é chamado internamente por LoggerConfiguration::apply().
+    * Também pode ser usado para aplicar uma configuração já criada.
+    *
+    * @param LoggerConfiguration $config Configuração a ser aplicada.
+    * @return void
+    */
+   public static function applyConfiguration(LoggerConfiguration $config): void
+   {
+      // Intenção: resetar inicialização se já estiver inicializado para permitir reconfiguração.
+      if (self::$initialized)
+      {
+         self::$initialized = false;
+         self::$engine = null;
+      }
+
+      // Intenção: armazenar a nova configuração.
+      self::$configuration = $config;
+
+      // Intenção: aplicar campos sensíveis customizados imediatamente.
+      $customFields = $config->getCustomSensitiveFields();
+      if (!empty($customFields))
+      {
+         self::$customSensitiveFields = $customFields;
+      }
+
+      // Intenção: aplicar modo de mascaramento imediatamente.
+      self::$maskMode = $config->getMaskMode();
    }
 
    // =========================================================================================
@@ -356,51 +455,62 @@ class Logger
    /**
     * Habilita envio de notificacoes por email para mensagens `ERROR+`.
     *
-    * Chame este metodo antes de gerar o primeiro log do ciclo para que o
-    * handler NativeMailer seja anexado em {@see self::initialize()}.
+    * Este método é um alias para a configuração fluente. Para uma experiência
+    * mais completa, use Logger::configure()->enableEmail().
     *
     * @param string $senderEmail Endereco remetente das notificacoes.
     * @param string $recipientEmail Endereco destinatario das notificacoes.
     * @param string|null $subject Assunto customizado (padrao: "Erro detectado no sistema").
     * @return void
+    * @deprecated Use Logger::configure()->enableEmail()->apply() instead.
     */
    public static function enableLogByEmail(string $senderEmail, string $recipientEmail, ?string $subject = null): void
    {
-      if (!filter_var($senderEmail, FILTER_VALIDATE_EMAIL) || !filter_var($recipientEmail, FILTER_VALIDATE_EMAIL))
+      // Intenção: garantir que há uma configuração para aplicar.
+      if (self::$configuration === null)
       {
-         self::$fail = new Exception("Invalid email address provided for logging.");
-         return;
+         self::$configuration = new LoggerConfiguration();
       }
 
-      // Intenção: configurar parâmetros para envio de notificações por email.
-      self::$senderEmail = $senderEmail;
-      self::$recipientEmail = $recipientEmail;
-      self::$subject = $subject ?? "Erro detectado no sistema";
-      self::$emailEnabled = true;
+      // Intenção: usar configuração fluente internamente.
+      $config = self::$configuration;
+      $config->enableEmail($senderEmail, $recipientEmail, $subject);
+
+      // Intenção: aplicar se já estava inicializado, senão será aplicado na inicialização.
+      if (self::$initialized)
+      {
+         self::applyConfiguration($config);
+      }
    }
 
    /**
     * Habilita envio de notificacoes via Telegram para mensagens `ERROR+`.
     *
-    * Configure antes da primeira escrita de log para garantir que o handler
-    * {@see TelegramBotHandler} seja registrado na inicializacao.
+    * Este método é um alias para a configuração fluente. Para uma experiência
+    * mais completa, use Logger::configure()->enableTelegram().
     *
     * @param string $botToken Token do bot do Telegram (BotFather).
     * @param string $chatId Chat ou canal que recebera as mensagens.
     * @return void
+    * @deprecated Use Logger::configure()->enableTelegram()->apply() instead.
     */
    public static function enableLogByTelegram(string $botToken, string $chatId): void
    {
-      if (empty($botToken) || empty($chatId))
+      // Intenção: garantir que há uma configuração para aplicar.
+      if (self::$configuration === null)
       {
-         self::$fail = new Exception("Invalid Telegram bot token or chat ID provided for logging.");
-         return;
+         self::$configuration = new LoggerConfiguration();
       }
 
-      // Intenção: configurar parâmetros para envio de notificações por Telegram.
-      self::$telegramBotToken = $botToken;
-      self::$telegramChatId = $chatId;
-      self::$telegramEnabled = true;
+      // Intenção: usar configuração fluente internamente.
+      $config = self::$configuration;
+      $config->enableTelegram($botToken, $chatId);
+
+      // Intenção: aplicar se já estava inicializado, senão será aplicado na inicialização.
+      if (self::$initialized)
+      {
+         self::applyConfiguration($config);
+      }
    }
 
    /**
@@ -619,27 +729,4 @@ class Logger
       return $sanitized;
    }
 
-   /**
-    * Ajusta diretorio, rotulos e niveis padrao do logger.
-    *
-    * As configuracoes devem ser aplicadas antes da primeira escrita de log para
-    * que os handlers criados em {@see self::initialize()} reflitam os valores.
-    *
-    * @param array $settings Chaves suportadas: dir_logs, file_log_label, level_file_log,
-    *                        level_email_log e level_telegram_log.
-    * @return void
-    */
-   public static function settings(array $settings = []): void
-   {
-      // Intenção: garantir que logger está inicializado antes de registrar.
-      self::initialize();
-      // Intenção: definir diretório de logs customizado se fornecido.
-      self::setLogDirectory($settings['dir_logs'] ?? null);
-
-      // Intenção: aplicar configurações fornecidas ou manter valores atuais.
-      self::$fileLogLabel     = $settings['file_log_label']       ?? self::$fileLogLabel;
-      self::$levelFileLog     = $settings['level_file_log']       ?? self::LEVEL_DEBUG;
-      self::$levelEmailLog    = $settings['level_email_log']      ?? self::LEVEL_ERROR;
-      self::$levelTelegramLog = $settings['level_telegram_log']   ?? self::LEVEL_CRITICAL;
-   }
 }

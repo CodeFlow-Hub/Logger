@@ -43,7 +43,7 @@ class LoggerTest extends TestCase
 
       // Reset logger state para cada teste
       $reflection = new \ReflectionClass(Logger::class);
-      $properties = ['engine', 'initialized', 'requestId', 'emailEnabled', 'telegramEnabled', 'customSensitiveFields', 'maskMode'];
+      $properties = ['engine', 'initialized', 'requestId', 'configuration', 'fail', 'customSensitiveFields', 'maskMode'];
 
       foreach ($properties as $property)
       {
@@ -192,24 +192,12 @@ class LoggerTest extends TestCase
          'Test Subject'
       );
 
-      $reflection = new \ReflectionClass(Logger::class);
+      $config = $this->currentConfiguration();
 
-      $senderProp = $reflection->getProperty('senderEmail');
-      $senderProp->setAccessible(true);
-
-      $recipientProp = $reflection->getProperty('recipientEmail');
-      $recipientProp->setAccessible(true);
-
-      $subjectProp = $reflection->getProperty('subject');
-      $subjectProp->setAccessible(true);
-
-      $enabledProp = $reflection->getProperty('emailEnabled');
-      $enabledProp->setAccessible(true);
-
-      $this->assertEquals('from@example.com', $senderProp->getValue());
-      $this->assertEquals('to@example.com', $recipientProp->getValue());
-      $this->assertEquals('Test Subject', $subjectProp->getValue());
-      $this->assertTrue($enabledProp->getValue());
+      $this->assertEquals('from@example.com', $config->getSenderEmail());
+      $this->assertEquals('to@example.com', $config->getRecipientEmail());
+      $this->assertEquals('Test Subject', $config->getSubject());
+      $this->assertTrue($config->isEmailEnabled());
    }
 
    /**
@@ -224,20 +212,96 @@ class LoggerTest extends TestCase
    {
       Logger::enableLogByTelegram('bot_token', 'chat_id');
 
-      $reflection = new \ReflectionClass(Logger::class);
+      $config = $this->currentConfiguration();
 
-      $tokenProp = $reflection->getProperty('telegramBotToken');
-      $tokenProp->setAccessible(true);
+      $this->assertEquals('bot_token', $config->getTelegramBotToken());
+      $this->assertEquals('chat_id', $config->getTelegramChatId());
+      $this->assertTrue($config->isTelegramEnabled());
+   }
 
-      $chatProp = $reflection->getProperty('telegramChatId');
-      $chatProp->setAccessible(true);
+   /**
+    * Testa se o nível configurado via settings() é respeitado pelo handler de arquivo.
+    *
+    * Regressão: settings() inicializava o handler com DEBUG antes de ler o nível
+    * informado, e o nível configurado nunca era aplicado.
+    *
+    * @return void
+    */
+   public function testSettingsAppliesFileLogLevel(): void
+   {
+      Logger::settings([
+         'dir_logs'       => $this->fileSystem->url(),
+         'file_log_label' => 'app.log',
+         'level_file_log' => Logger::LEVEL_INFO,
+      ]);
 
-      $enabledProp = $reflection->getProperty('telegramEnabled');
-      $enabledProp->setAccessible(true);
+      Logger::debug('Debug message');
+      Logger::info('Info message');
 
-      $this->assertEquals('bot_token', $tokenProp->getValue());
-      $this->assertEquals('chat_id', $chatProp->getValue());
-      $this->assertTrue($enabledProp->getValue());
+      $content = $this->fileSystem->getChild('app.log')->getContent();
+      $this->assertStringNotContainsString('Debug message', $content);
+      $this->assertStringContainsString('Info message', $content);
+   }
+
+   /**
+    * Testa se settings() reconfigura o handler quando chamado após a primeira escrita.
+    *
+    * @return void
+    */
+   public function testSettingsReconfiguresAfterFirstLog(): void
+   {
+      Logger::settings(['dir_logs' => $this->fileSystem->url(), 'file_log_label' => 'app.log']);
+      Logger::debug('Debug before settings');
+
+      Logger::settings(['level_file_log' => Logger::LEVEL_WARNING]);
+      Logger::info('Info after settings');
+      Logger::warning('Warning after settings');
+
+      $content = $this->fileSystem->getChild('app.log')->getContent();
+      $this->assertStringContainsString('Debug before settings', $content);
+      $this->assertStringNotContainsString('Info after settings', $content);
+      $this->assertStringContainsString('Warning after settings', $content);
+   }
+
+   /**
+    * Testa se configure() preserva notificações habilitadas antes da configuração fluente.
+    *
+    * @return void
+    */
+   public function testConfigurePreservesPreviouslyEnabledTelegram(): void
+   {
+      Logger::enableLogByTelegram('bot_token', 'chat_id');
+      Logger::configure()->setLevelFileLog(Logger::LEVEL_INFO)->apply();
+
+      $config = $this->currentConfiguration();
+      $this->assertTrue($config->isTelegramEnabled());
+      $this->assertEquals(Logger::LEVEL_INFO, $config->getLevelFileLog());
+   }
+
+   /**
+    * Testa se settings() registra erro de validação em fail() sem lançar exceção.
+    *
+    * @return void
+    */
+   public function testSettingsReportsInvalidDirectoryThroughFail(): void
+   {
+      Logger::settings(['dir_logs' => $this->fileSystem->url() . '/missing']);
+
+      $this->assertNotNull(Logger::fail());
+      $this->assertStringContainsString('does not exist', Logger::fail()->getMessage());
+   }
+
+   /**
+    * Retorna a configuração atualmente armazenada no Logger.
+    *
+    * @return \CodeFlowHub\Logger\LoggerConfiguration
+    */
+   private function currentConfiguration(): \CodeFlowHub\Logger\LoggerConfiguration
+   {
+      $prop = (new \ReflectionClass(Logger::class))->getProperty('configuration');
+      $prop->setAccessible(true);
+
+      return $prop->getValue();
    }
 
    /**

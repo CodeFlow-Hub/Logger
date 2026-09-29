@@ -12,18 +12,25 @@ use CodeFlowHub\Logger\Logger;
 
 echo "=== CodeFlow Logger - Exemplo Avançado ===\n\n";
 
-// Configurar notificações por email (opcional)
-// Logger::enableLogByEmail(
-//     'noreply@meuapp.com',
-//     'admin@meuapp.com', 
-//     'Sistema: Erro Crítico Detectado'
-// );
-
-// Configurar notificações por Telegram (opcional)  
-// Logger::enableLogByTelegram(
-//     '123456:ABC-DEF1234567890',  // Token do bot
-//     '-1001234567890'             // Chat ID
-// );
+// Configuração fluente do Logger (opcional)
+// Logger::configure()
+//     ->setLogDirectory(__DIR__ . '/../logs')
+//     ->setFileLogLabel('app-' . date('Y-m-d') . '.log')
+//     ->setLevelFileLog(Logger::LEVEL_DEBUG)
+//     ->setLevelEmailLog(Logger::LEVEL_ERROR)
+//     ->setLevelTelegramLog(Logger::LEVEL_CRITICAL)
+//     ->enableEmail(
+//         'noreply@meuapp.com',
+//         'admin@meuapp.com',
+//         'Sistema: Erro Crítico Detectado'
+//     )
+//     ->enableTelegram(
+//         '123456:ABC-DEF1234567890',  // Token do bot
+//         '-1001234567890'             // Chat ID
+//     )
+//     ->addSensitiveFields(['credit_card', 'ssn', 'api_key'])
+//     ->setMaskMode(Logger::MASK_MODE_PARTIAL)
+//     ->apply();
 
 echo "1. Simulando fluxo de uma aplicação web:\n";
 

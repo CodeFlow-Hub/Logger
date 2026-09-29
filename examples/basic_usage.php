@@ -53,10 +53,15 @@ Logger::emergency('Emergency message');
 
 echo "✓ Todos os níveis testados\n\n";
 
-// 5. Configuração opcional (descomente para testar)
-echo "5. Configuração de notificações (comentado):\n";
-echo "// Logger::enableLogByEmail('from@example.com', 'to@example.com', 'Erro no Sistema');\n";
-echo "// Logger::enableLogByTelegram('bot_token', 'chat_id');\n\n";
+// 5. Configuração fluente (nova abordagem)
+echo "5. Configuração fluente do Logger:\n";
+echo "// Logger::configure()\n";
+echo "//     ->setLogDirectory(__DIR__ . '/logs')\n";
+echo "//     ->setFileLogLabel('app-' . date('Y-m-d') . '.log')\n";
+echo "//     ->setLevelFileLog(Logger::LEVEL_DEBUG)\n";
+echo "//     ->enableEmail('from@example.com', 'to@example.com', 'Erro no Sistema')\n";
+echo "//     ->enableTelegram('bot_token', 'chat_id')\n";
+echo "//     ->apply();\n\n";
 
 echo "=== Exemplo concluído! ===\n";
 echo "Verifique o arquivo de log em: logs/app-" . date('Y-m-d') . ".log\n";
