@@ -1,0 +1,2 @@
+# Intenção: gravar sempre LF no repositório, independente do editor ou do sistema operacional.
+* text=auto eol=lf
