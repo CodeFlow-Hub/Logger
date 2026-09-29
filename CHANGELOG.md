@@ -18,16 +18,6 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
-### Corrigido
-- `level_file_log`, `dir_logs` e `file_log_label` passados em `Logger::settings()` eram ignorados: o handler de arquivo era criado com DEBUG antes da leitura das configurações
-- `Logger::configure()->apply()` descartava email/Telegram habilitados antes via `enableLogByEmail()`/`enableLogByTelegram()`
-
-### Mudado
-- `Logger::configure()` parte de uma cópia da configuração atual em vez de uma configuração vazia
-
-### Depreciado
-- `Logger::settings()`, mantido como alias da configuração fluente; use `Logger::configure()->...->apply()`
-
 ### Planejado
 - Suporte a mais handlers do Monolog (Slack, Discord, etc.)
 - Formatters customizados
@@ -36,9 +26,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
-## [1.0.10] - 2025-11-12
+## [1.0.10] - 2026-09-29
 
 ### Adicionado
+- Configuração fluente com `Logger::configure()` e a classe `LoggerConfiguration`, partindo sempre da configuração atual
 - Método `Logger::addSensitiveFields()` para adicionar campos sensíveis customizados
 - Método `Logger::setMaskMode()` para configurar modo de mascaramento
 - Constantes `MASK_MODE_REDACTED` e `MASK_MODE_PARTIAL` para modos de mascaramento
@@ -53,10 +44,16 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Melhorada a detecção de campos sensíveis com verificação case-insensitive
 - Documentação expandida com exemplos de campos customizados e modos de mascaramento
 
+### Depreciado
+- `Logger::settings()`, mantido como alias da configuração fluente; use `Logger::configure()->...->apply()`
+- `Logger::enableLogByEmail()` e `Logger::enableLogByTelegram()`; use `enableEmail()`/`enableTelegram()` da configuração fluente
+
 ### Corrigido
 - Correção na sanitização de arrays aninhados profundos
 - Correção na validação de emails inválidos
 - Correção no tratamento de valores não-escalares em campos sensíveis
+- `level_file_log`, `dir_logs` e `file_log_label` passados em `Logger::settings()` eram ignorados: o handler de arquivo era criado com DEBUG antes da leitura das configurações
+- `Logger::configure()->apply()` descartava email/Telegram habilitados antes via `enableLogByEmail()`/`enableLogByTelegram()`
 
 ---
 

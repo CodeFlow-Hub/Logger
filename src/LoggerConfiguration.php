@@ -11,7 +11,7 @@ use Exception;
  * Todas as configurações são validadas antes de serem aplicadas.
  *
  * @package CodeFlowHub\Logger
- * @since 2.1.0
+ * @since 1.0.10
  */
 class LoggerConfiguration
 {
